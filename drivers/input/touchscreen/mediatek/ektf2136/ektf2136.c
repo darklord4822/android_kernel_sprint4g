@@ -17,9 +17,7 @@
 #include <linux/jiffies.h>
 #include <linux/miscdevice.h>
 #include <linux/hrtimer.h>
-
 #include "tpd_custom_ektf2136.h"
-
 #include <mach/mt_pm_ldo.h> 
 #include <mach/mt_typedefs.h>
 #include <mach/mt_boot.h>
@@ -30,22 +28,19 @@
 #include <linux/slab.h>
 #include <linux/uaccess.h>
 #include <asm/ioctl.h>
-
 //dma
 #include <linux/dma-mapping.h>
 
 #define I2C_NUM 1
 
-//#define SOFTKEY_AXIS_VER
 //#define ELAN_TEN_FINGERS
 //#define _DMA_MODE_
 
 #define ELAN_BUTTON
-//#define LCT_VIRTUAL_KEY
-//#define TPD_HAVE_BUTTON
-#define ELAN_3K_IC_SOLUTION
+#define TPD_HAVE_BUTTON
+//#define ELAN_3K_IC_SOLUTION
 
-
+#define LCT_VIRTUAL_KEY
 #ifdef ELAN_TEN_FINGERS
 #define PACKET_SIZE		34 //44		/* support 10 fingers packet */
 #else
@@ -60,8 +55,6 @@ static int tpd_wb_end_local[TPD_WARP_CNT]   = TPD_WARP_END;
 static int tpd_calmat_local[8]     = TPD_CALIBRATION_MATRIX;
 static int tpd_def_calmat_local[8] = TPD_CALIBRATION_MATRIX;
 #endif
-
-//#define MTK_ELAN_DEBUG
 
 #define PWR_STATE_DEEP_SLEEP              0
 #define PWR_STATE_NORMAL                  1
@@ -81,18 +74,14 @@ static int tpd_def_calmat_local[8] = TPD_CALIBRATION_MATRIX;
 #define CALIB_PKT                    			0xA8
 
 #define TPD_OK 0
-
-#ifdef MTK_ELAN_DEBUG
-	#define MTK_TP_DEBUG(fmt, args ...) printk("mtk-tpd: %5d: " fmt, __LINE__,##args)
-#else
-	#define MTK_TP_DEBUG(fmt, args ...)
-#endif
+#define MTK_TP_DEBUG(fmt, args ...)
 
 
 #ifdef TPD_HAVE_BUTTON
 #define TPD_KEY_COUNT           3
 #define TPD_KEYS                { KEY_MENU, KEY_HOMEPAGE, KEY_BACK}
-#define TPD_KEYS_DIM            {{100,954,30,TPD_BUTTON_HEIGH},{200,954,30,TPD_BUTTON_HEIGH},{300,954,30,TPD_BUTTON_HEIGH}}
+#define TPD_KEYS_DIM            {{120,900,120,100},{240,900,120,100},{360,900,120,100}}
+
 
 static int tpd_keys_local[TPD_KEY_COUNT] = TPD_KEYS;
 static int tpd_keys_dim_local[TPD_KEY_COUNT][4] = TPD_KEYS_DIM;
@@ -1161,9 +1150,6 @@ static int elan_ktf2k_ts_recv_data(struct i2c_client *client, uint8_t *buf)
          rc = i2c_master_recv(client, gpDMABuf_pa, bytes_to_recv);
          copy_to_user(buf, pReadData, bytes_to_recv);
          client->addr = addr;
-         #ifdef ELAN_DEBUG
-        MTK_TP_DEBUG("[elan_debug] %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x\n", buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], buf[7],buf[8], buf[9], buf[10], buf[11], buf[12], buf[13], buf[14], buf[15],buf[16], buf[17]);
-         #endif
          
 #else         
          #ifdef NON_MTK_MODE	//I2C support > 8bits transfer
@@ -1222,144 +1208,49 @@ static int elan_ktf2k_ts_recv_data(struct i2c_client *client, uint8_t *buf)
          return rc;
 }
 
-#ifdef SOFTKEY_AXIS_VER //SOFTKEY is reported via AXI
-static void elan_ktf2k_ts_report_data(struct i2c_client *client, uint8_t *buf)
+static  void tpd_down(int x, int y, int p) 
 {
-         struct input_dev *idev = tpd->dev;
-         uint16_t x, y;
-         uint16_t fbits=0;
-         uint8_t i, num, reported = 0;
-         uint8_t idx, btn_idx;
-         int finger_num;
-         int limitY = Y_RESOLUTION - 100; // limitY need define by Case!
-/* for 10 fingers       */
-         if (buf[0] == TEN_FINGERS_PKT){
-                  finger_num = 10;
-                  num = buf[2] & 0x0f; 
-                  fbits = buf[2] & 0x30;       
-                       fbits = (fbits << 4) | buf[1]; 
-                  idx=3;
-                       btn_idx=33;
-      }
-// for 5 fingers 
-         else if ((buf[0] == MTK_FINGERS_PKT) || (buf[0] == FIVE_FINGERS_PKT)){
-                  finger_num = 5;
-                  num = buf[1] & 0x07; 
-        fbits = buf[1] >>3;
-                  idx=2;
-                  btn_idx=17;
-         }else{
-// for 2 fingers      
-                   finger_num = 2;
-                   num = buf[7] & 0x03; 
-                   fbits = buf[7] & 0x03;
-                   idx=1;
-                   btn_idx=7;
-         }
+     if (RECOVERY_BOOT == get_boot_mode())
+     {
+     }
+	 else
+	 {
+	 	input_report_key(tpd->dev, BTN_TOUCH, 1);
+	 }
+	 input_report_abs(tpd->dev, ABS_MT_PRESSURE, 1);
+	 input_report_abs(tpd->dev, ABS_MT_TOUCH_MAJOR, 20);
+	 input_report_abs(tpd->dev, ABS_MT_POSITION_X, x);
+	 input_report_abs(tpd->dev, ABS_MT_POSITION_Y, y);
+         input_report_abs(tpd->dev, ABS_MT_TRACKING_ID, p); 
+	 input_mt_sync(tpd->dev);
+     if (FACTORY_BOOT == get_boot_mode()|| RECOVERY_BOOT == get_boot_mode())
+     {   
+       tpd_button(x, y, 1);  
+     }
+	 if(y > TPD_RES_Y) //virtual key debounce to avoid android ANR issue
+	 {
+		 printk("D virtual key \n");
+	 }
+	 TPD_EM_PRINT(x, y, x, y, p-1, 1);
+ }
 
-         switch (buf[0]) {
-                   case MTK_FINGERS_PKT:
-                   case TWO_FINGERS_PKT:
-                   case FIVE_FINGERS_PKT:         
-                   case TEN_FINGERS_PKT:
-                            if (num == 0)
-                            {
-                                     if(key_pressed < 0){
-                                               input_report_key(tpd->dev, BTN_TOUCH, 0);
-                                               input_report_abs(idev, ABS_MT_TOUCH_MAJOR, 0);
-                                               input_report_abs(idev, ABS_MT_WIDTH_MAJOR, 0);
-                                               input_mt_sync(idev);
-                                               if (FACTORY_BOOT == get_boot_mode()|| RECOVERY_BOOT == get_boot_mode())
-                                               {   
-                                               tpd_button(x, y, 0);  
-                                               }
-                                               TPD_EM_PRINT(x, y, x, y, 0, 0);
-                                     }
-                                     else{
-                                               input_report_key(idev, OSD_mapping[key_pressed].key_event, 0);
-                                               key_pressed = -1;
-                                     }
-                            }
-                            else 
-                            {
-                                     for (i = 0; i < finger_num; i++) 
-                                     {        
-                                               if ((fbits & 0x01)) 
-                                               {
-                                                        elan_ktf2k_ts_parse_xy(&buf[idx], &x, &y);
-#if 1
-         if(X_RESOLUTION > 0 && Y_RESOLUTION > 0)
-         {
-                   x = ( x * LCM_X_MAX )/X_RESOLUTION;
-                   y = ( y * LCM_Y_MAX )/Y_RESOLUTION;
-                                                MTK_TP_DEBUG("x=%x, y=%x\n", x, y);
-
-         }
-         else
-         {
-                   x = ( x * LCM_X_MAX )/ELAN_X_MAX;
-                   y = ( y * LCM_Y_MAX )/ELAN_Y_MAX;
-                             MTK_TP_DEBUG("x=%x, y=%x\n", x, y);
-
-         }
-#endif                 
-                                                        MTK_TP_DEBUG("[elan_debug SOFTKEY_AXIS_VER] %s, x=%d, y=%d\n",__func__, x , y);
-                                                                                         
-                                                        if (!((x<=0) || (y<=0) || (x>=X_RESOLUTION) || (y>=Y_RESOLUTION))) 
-                                                        {   
-                                                                 if ( y < limitY )
-                                                                 {
-                                                                 					 MTK_TP_DEBUG("mtk-tpd elan_ktf2k_ts_report_data x=%d y=%d id=%d \n",x,y,i);
-                                                                 					 input_report_key(tpd->dev, BTN_TOUCH, 1);
-                                                                 					 input_report_abs(idev, ABS_MT_TRACKING_ID, i);
-                                                                           input_report_abs(idev, ABS_MT_TOUCH_MAJOR, 8);
-                                                                           input_report_abs(idev, ABS_MT_POSITION_X, x);
-                                                                           input_report_abs(idev, ABS_MT_POSITION_Y, y);
-                                                                           input_mt_sync(idev);
-                                                                           if (FACTORY_BOOT == get_boot_mode()|| RECOVERY_BOOT == get_boot_mode())
-                                                                           {   
-                                                                           tpd_button(x, y, 1);  
-                                                                           }
-                                                                           TPD_EM_PRINT(x, y, x, y, i-1, 1);
-                                                                 }
-                                                                 else
-                                                                 {
-                                                                 			int i=0;
-                                                                 			for(i=0;i<4;i++)
-                                                                 			{
-                                                                           if((x > OSD_mapping[i].left_x) && (x < OSD_mapping[i].right_x))
-                                                                           {
-                                                                                    input_report_key(idev, OSD_mapping[i].key_event, 1);
-                                                                                    key_pressed = i;
-                                                                           }
-                                                                 			}
-                                                                 }
-                                                                 reported++;
-                                                                 
-                                                        } // end if border
-                                               } // end if finger status
-                                              fbits = fbits >> 1;
-                                              idx += 3;
-                                     } // end for
-                            }
-
-                            if (reported)
-                                     input_sync(idev);
-                            else 
-                            {
-                                     input_mt_sync(idev);
-                                     input_sync(idev);
-                                     MTK_TP_DEBUG("mtk-tpd elan_ktf2k_ts_report_data up\n");
-                            }
-
-                            break;
-                  default:
-                                     MTK_TP_DEBUG("[elan] %s: unknown packet type: %0x\n", __func__, buf[0]);
-                                     break;
-         } // end switch
-         return;
+ static  void tpd_up(int x, int y,int *count)
+{
+		if (RECOVERY_BOOT == get_boot_mode())
+		{
+		}
+		else
+		{
+		 input_report_key(tpd->dev, BTN_TOUCH, 0);
+		}	
+		 input_mt_sync(tpd->dev);
+		 TPD_EM_PRINT(x, y, x, y, 0, 0);
+     if (FACTORY_BOOT == get_boot_mode()|| RECOVERY_BOOT == get_boot_mode())
+     {   
+        tpd_button(x, y, 0); 
+     }   		 
 }
-#else //SOFTKEY is reported via BTN bit
+
 static void elan_ktf2k_ts_report_data(struct i2c_client *client, uint8_t *buf)
 {
          struct input_dev *idev = tpd->dev;
@@ -1368,6 +1259,8 @@ static void elan_ktf2k_ts_report_data(struct i2c_client *client, uint8_t *buf)
          uint8_t i, num, reported = 0;
          uint8_t idx, btn_idx;
          int finger_num;
+	 static	int tmp_x = 0;
+	 static int tmp_y = 0;
 /* for 10 fingers       */
          if (buf[0] == TEN_FINGERS_PKT){
                   finger_num = 10;
@@ -1401,10 +1294,6 @@ static void elan_ktf2k_ts_report_data(struct i2c_client *client, uint8_t *buf)
                             if (num == 0)
                             {
                                      dev_dbg(&client->dev, "no press\n");
-                                     #ifdef ELAN_DEBUG
-                                     MTK_TP_DEBUG("button_state0 = %x\n",button_state);
-								     MTK_TP_DEBUG("buf[btn_idx] = %x KEY_MENU=%x KEY_HOME=%x KEY_BACK=%x KEY_SEARCH =%x\n",buf[btn_idx], KEY_MENU, KEY_HOME, KEY_BACK, KEY_SEARCH);
-                                     #endif
                                      
                                      if (FACTORY_BOOT == get_boot_mode()|| RECOVERY_BOOT == get_boot_mode())
                                      {   
@@ -1416,21 +1305,32 @@ static void elan_ktf2k_ts_report_data(struct i2c_client *client, uint8_t *buf)
 					switch (buf[btn_idx]) {
 				    	case ELAN_KEY_1:
 						//printk("KEY back 1\n");
-						input_report_key(idev, KEY_BACK, 1);
+						//input_report_key(idev, KEY_BACK, 1);
+						tmp_x = tpd_keys_dim_local[2][0];
+						tmp_y = tpd_keys_dim_local[2][1];
+						tpd_down(tmp_x, tmp_y, 1);
 						button_state = ELAN_KEY_1;
 						break;
 				    	case ELAN_KEY_2:
 						//printk("KEY home 2\n");
-						input_report_key(idev, KEY_HOMEPAGE, 1);
+						//input_report_key(idev, KEY_HOMEPAGE, 1);
+						tmp_x = tpd_keys_dim_local[1][0];
+						tmp_y = tpd_keys_dim_local[1][1];
+						tpd_down(tmp_x, tmp_y, 1);
 						button_state = ELAN_KEY_2;
 						break;
 						case ELAN_KEY_3:
 						printk("KEY Recent 2\n");
-						input_report_key(idev, KEY_MENU, 1);
+						//input_report_key(idev, KEY_MENU, 1);
+						tmp_x = tpd_keys_dim_local[0][0];
+						tmp_y = tpd_keys_dim_local[0][1];
+						tpd_down(tmp_x, tmp_y, 1);
 						button_state = ELAN_KEY_3;
 						break;
 					default: ///release key		
 				  		printk("[ELAN ] test tpd up\n");
+						tpd_up(tmp_x, tmp_y, 0);
+						/*
 						if (button_state == ELAN_KEY_1)
 						{
 							input_report_key(idev, KEY_BACK, 0);
@@ -1450,7 +1350,10 @@ static void elan_ktf2k_ts_report_data(struct i2c_client *client, uint8_t *buf)
 							input_report_abs(idev, ABS_MT_WIDTH_MAJOR, 0);
 						}
 						input_mt_sync(idev);
-                				button_state = 0;
+                				button_state = 0;	
+						*/		
+                    				tpd_up(tmp_x, tmp_y, 0);
+						tpd_down_flag = 0;
                					break;
 				    }
 								  
@@ -1480,10 +1383,7 @@ static void elan_ktf2k_ts_report_data(struct i2c_client *client, uint8_t *buf)
 
                         }
                                                         #endif                 
-
-                                                        #ifdef ELAN_DEBUG
-                                                        MTK_TP_DEBUG("mtk-tpd:[elan_debug  BTN bit] %s, x=%d, y=%d\n",__func__, x , y);
-                                                        #endif                          
+                         
                                                         if (!((x<=0) || (y<=0) || (x>=LCM_X_MAX) || (y>=LCM_Y_MAX))) 
                                                         {   
                                                                  input_report_key(idev, BTN_TOUCH, 1);
@@ -1521,7 +1421,6 @@ static void elan_ktf2k_ts_report_data(struct i2c_client *client, uint8_t *buf)
          } // end switch
          return;
 }
-#endif
 
 static void elan_ktf2k_ts_work_func(struct work_struct *work)
 {
@@ -1772,12 +1671,6 @@ static int tpd_probe(struct i2c_client *client, const struct i2c_device_id *id)
         printk(KERN_INFO "[elan] Allocate DMA I2C Buffer failed\n");
     }
 #endif
-
-         #ifndef LCT_VIRTUAL_KEY
-         set_bit( KEY_BACK,  tpd->dev->keybit );
-         set_bit( KEY_HOMEPAGE,  tpd->dev->keybit );
-         set_bit( KEY_MENU,  tpd->dev->keybit );
-         #endif
          
 // Setup Interrupt Pin
          mt_set_gpio_mode(GPIO_CTP_EINT_PIN, GPIO_CTP_EINT_PIN_M_EINT);
@@ -1793,6 +1686,12 @@ static int tpd_probe(struct i2c_client *client, const struct i2c_device_id *id)
          
          tpd_load_status = 1;
          
+	#ifndef LCT_VIRTUAL_KEY
+	set_bit( KEY_BACK,  tpd->dev->keybit );
+    	set_bit( KEY_HOMEPAGE,  tpd->dev->keybit );
+    	set_bit( KEY_MENU,  tpd->dev->keybit );
+	#endif
+
          thread = kthread_run(touch_event_handler, 0, TPD_DEVICE);
          if(IS_ERR(thread))
          {
@@ -1909,7 +1808,9 @@ static int tpd_local_init(void)
     }
 
 #ifdef TPD_HAVE_BUTTON
+	#ifdef LCT_VIRTUAL_KEY
     tpd_button_setting(TPD_KEY_COUNT, tpd_keys_local, tpd_keys_dim_local);// initialize tpd button data
+	#endif
 #endif
 
 #if (defined(TPD_WARP_START) && defined(TPD_WARP_END))

@@ -24,23 +24,10 @@ struct elan_ktf2k_i2c_platform_data {
 	int intr_gpio;
 	int (*power)(int on);
 };
-
-//softkey is reported as AXIS
-//#define SOFTKEY_AXIS_VER
-
-//Orig. point at upper-right, reverse it.
-//#define REVERSE_X_AXIS
 struct osd_offset{
 	int left_x;
 	int right_x;
 	unsigned int key_event;
-};
-
-//Elan add for OSD bar coordinate
-static struct osd_offset OSD_mapping[] = {
-  {35, 99,   KEY_MENU},	//menu_left_x, menu_right_x, KEY_MENU
-  {203, 267, KEY_HOME},	//home_left_x, home_right_x, KEY_HOME
-  {373, 437, KEY_BACK},	//back_left_x, back_right_x, KEY_BACK
 };
 
 static int key_pressed = -1;
