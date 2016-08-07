@@ -3144,7 +3144,7 @@ void mt_cpufreq_set_ramp_down_count_const(enum mt_cpu_dvfs_id id, int count)
 
     BUG_ON(NULL == p);
 
-    //p->ramp_down_count_const = count;
+    p->ramp_down_count_const = count;
 }
 EXPORT_SYMBOL(mt_cpufreq_set_ramp_down_count_const);
 #endif

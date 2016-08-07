@@ -561,7 +561,7 @@ int mt_brightness_set_pmic(enum mt65xx_led_pmic pmic_type, u32 level, u32 div)
 			pmic_set_register_value(PMIC_RG_DRV_ISINK1_CK_PDN,0);
 			pmic_set_register_value(PMIC_RG_DRV_ISINK1_CK_CKSEL,0);
 			pmic_set_register_value(PMIC_ISINK_CH1_MODE,PMIC_PWM_0);
-			pmic_set_register_value(PMIC_ISINK_CH1_STEP,ISINK_0);//16mA //ISINK_3->ISINK_0,bug id:XWLLE-504,modified by lijian,defalut current 4ma 20150531
+			pmic_set_register_value(PMIC_ISINK_CH1_STEP,ISINK_3);//16mA
 			pmic_set_register_value(PMIC_ISINK_DIM1_DUTY,15);
 			pmic_set_register_value(PMIC_ISINK_DIM1_FSEL,ISINK_1KHZ);//1KHz
 			if (level) 

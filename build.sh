@@ -214,3 +214,4 @@ else
 fi
 
 copy_to_legacy_download_flash_folder   $outdir/kernel_${MTK_PROJECT}.bin rootfs_${MTK_PROJECT}.bin
+

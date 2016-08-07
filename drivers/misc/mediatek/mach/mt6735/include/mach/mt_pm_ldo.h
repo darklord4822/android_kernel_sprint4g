@@ -169,6 +169,7 @@ typedef struct
 // PMIC Exported Function for power service
 //==============================================================================
 
+
 extern bool hwPowerOn(MT65XX_POWER powerId, int voltage_uv, char *mode_name);
 extern bool hwPowerDown(MT65XX_POWER powerId, char *mode_name);
 

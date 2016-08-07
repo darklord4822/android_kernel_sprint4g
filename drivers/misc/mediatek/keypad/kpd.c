@@ -14,7 +14,8 @@
  *
  */
 
-
+#include <linux/workqueue.h>
+#include <linux/timer.h>
 /*kpd.h file path: ALPS/mediatek/kernel/include/linux */
 #include <linux/kpd.h>
 #ifdef CONFIG_MTK_TC1_FM_AT_SUSPEND
@@ -25,7 +26,11 @@
 #include <linux/of_address.h>
 #include <linux/of_irq.h>
 #endif
-
+#define FORCE_POWERKEY
+#define FORCE_POWERKEY_SECONDS   8
+struct timer_list timer;
+//extern void arch_reset(char mode, const char *cmd);
+extern void mt_power_off(void);
 #define KPD_NAME	"mtk-kpd"
 #define MTK_KP_WAKESOURCE	/* this is for auto set wake up source */
 
@@ -97,7 +102,28 @@ static struct platform_driver kpd_pdrv = {
 #endif
 	},
 };
+static void timer_exit() 
+{ 
+    del_timer(&timer); 
+}
 
+static void timer_function() 
+{ 
+    timer_exit();
+    //arch_reset(0, "charger");
+    mt_power_off();
+}
+
+static int timer_init() 
+{ 
+    init_timer(&timer); 
+    timer.data= 5; 
+    timer.expires = jiffies + (FORCE_POWERKEY_SECONDS*HZ);  
+    timer.function = timer_function; 
+    add_timer(&timer); 
+    printk(KPD_SAY "add_timer for FORCE_POWERKEY\n"); 
+    return 0; 
+}
 /********************************************************************/
 static void kpd_memory_setting(void)
 {
@@ -105,6 +131,7 @@ static void kpd_memory_setting(void)
 	kpd_init_keymap_state(kpd_keymap_state);
 	return;
 }
+
 
 
 /*****************for kpd auto set wake up source*************************/
@@ -352,7 +379,6 @@ static void kpd_pwrkey_eint_handler(void)
 }
 #endif
 /*********************************************************************/
-
 /*********************************************************************/
 #if KPD_PWRKEY_USE_PMIC
 void kpd_pwrkey_pmic_handler(unsigned long pressed)
@@ -362,6 +388,18 @@ void kpd_pwrkey_pmic_handler(unsigned long pressed)
 		printk("KPD input device not ready\n");
 		return;
 	}
+		#ifdef FORCE_POWERKEY
+		  if(pressed == 1)
+		  {
+		      printk(KPD_SAY "timer_init for FORCE_POWERKEY\n"); 
+		      timer_init();
+		  }
+		  else if(pressed == 0)
+		  {
+		      printk(KPD_SAY "timer_exit for FORCE_POWERKEY\n"); 
+		      timer_exit();
+		  }
+		#endif	
 	kpd_pmic_pwrkey_hal(pressed);
 }
 #endif
@@ -908,11 +946,11 @@ static int kpd_pdrv_remove(struct platform_device *pdev)
 static int kpd_pdrv_suspend(struct platform_device *pdev, pm_message_t state)
 {
 	kpd_suspend = true;
-#ifdef MTK_KP_WAKESOURCE
+#if 1//def MTK_KP_WAKESOURCE//by zhu
 	if (call_status == 2) {
 		kpd_print("kpd_early_suspend wake up source enable!! (%d)\n", kpd_suspend);
 	} else {
-		kpd_wakeup_src_setting(0);
+		kpd_wakeup_src_setting(1);//kpd_wakeup_src_setting(0);
 		kpd_print("kpd_early_suspend wake up source disable!! (%d)\n", kpd_suspend);
 	}
 #endif

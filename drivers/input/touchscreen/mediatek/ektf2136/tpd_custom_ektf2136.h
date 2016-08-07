@@ -29,6 +29,4 @@ struct osd_offset{
 	int right_x;
 	unsigned int key_event;
 };
-
-static int key_pressed = -1;
 #endif /* _LINUX_ELAN_KTF2K_H */
